@@ -55,8 +55,9 @@ Commands inside the chat: type a message, or `:quit` to exit.
 
 ### Web UI (recommended for demos)
 
-A Streamlit chat app over the same pipeline — shows live guardrail verdicts, token usage,
-latency, and memory-context size in the sidebar, and persists memory across sessions:
+A Streamlit chat app over the same pipeline — a **💬 Chat** tab (live guardrail verdicts,
+token usage, latency, and memory-context size in the sidebar) and a **🕸️ Memory graph** tab
+that renders the Cognee knowledge graph as it grows. Memory persists across sessions:
 
 ```bash
 source .venv/bin/activate

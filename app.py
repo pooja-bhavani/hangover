@@ -19,6 +19,7 @@ import os
 import time
 
 import streamlit as st
+import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
 from memory_agent.guardrails import Guardrails
@@ -61,12 +62,24 @@ with st.sidebar:
 if "history" not in st.session_state:
     st.session_state.history = []  # list[(role, text)]
 
+chat_tab, graph_tab = st.tabs(["💬 Chat", "🕸️ Memory graph"])
+
+with graph_tab:
+    st.caption("The Cognee knowledge graph built from your conversation (stored in Neo4j).")
+    if st.button("Refresh graph"):
+        try:
+            html = memory.graph_html()
+            components.html(html, height=600, scrolling=True)
+        except Exception as e:
+            st.warning(f"Couldn't render the graph yet (chat a bit first?): {e}")
+
+chat_box = chat_tab.container()
 for role, text in st.session_state.history:
-    st.chat_message(role).write(text)
+    chat_box.chat_message(role).write(text)
 
 user_input = st.chat_input("Tell me something, or ask what I remember…")
 if user_input:
-    st.chat_message("user").write(user_input)
+    chat_box.chat_message("user").write(user_input)
     st.session_state.history.append(("user", user_input))
     started = time.monotonic()
 
@@ -74,7 +87,7 @@ if user_input:
     gin = guard.check_input(user_input)
     if not gin.allowed:
         reply = gin.message or "Sorry, I can't help with that."
-        st.chat_message("assistant").write(reply)
+        chat_box.chat_message("assistant").write(reply)
         st.session_state.history.append(("assistant", reply))
         metrics.markdown(f"**input guardrail:** ❌ blocked\n\n**latency:** "
                          f"{(time.monotonic()-started)*1000:.0f} ms")
@@ -88,7 +101,7 @@ if user_input:
             memory.add_message(session_id, "user", user_input)
             memory.add_message(session_id, "assistant", reply)
 
-        st.chat_message("assistant").write(reply)
+        chat_box.chat_message("assistant").write(reply)
         st.session_state.history.append(("assistant", reply))
         metrics.markdown(
             f"**input guardrail:** ✅ allowed\n\n"

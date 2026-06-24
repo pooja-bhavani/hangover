@@ -93,3 +93,15 @@ class Memory:
     def flush(self) -> None:
         """Cognee persists synchronously per call; nothing extra to flush."""
         return None
+
+    def graph_html(self) -> str:
+        """Render the current Cognee knowledge graph as self-contained HTML."""
+
+        async def _build():
+            from cognee.infrastructure.databases.graph import get_graph_engine
+
+            engine = await get_graph_engine()
+            graph_data = await engine.get_graph_data()
+            return await cognee.cognee_network_visualization(graph_data)
+
+        return self._run(_build())
