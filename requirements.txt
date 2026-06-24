@@ -2,6 +2,7 @@ anthropic>=0.40
 # Cognee is the required memory layer: Claude LLM + Neo4j graph + local fastembed.
 cognee[anthropic,neo4j,fastembed]>=1.2.1
 python-dotenv>=1.0
+streamlit>=1.40
 
 # Guardrails (NeMo Guardrails) + the Anthropic engine it uses for rail checks.
 # NeMo requires Python 3.12/3.13 — it does not import on 3.14.

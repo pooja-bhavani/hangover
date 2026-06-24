@@ -53,6 +53,16 @@ python -m memory_agent.main
 
 Commands inside the chat: type a message, or `:quit` to exit.
 
+### Web UI (recommended for demos)
+
+A Streamlit chat app over the same pipeline — shows live guardrail verdicts, token usage,
+latency, and memory-context size in the sidebar, and persists memory across sessions:
+
+```bash
+source .venv/bin/activate
+streamlit run app.py            # opens http://localhost:8501
+```
+
 ## Prove the memory works
 
 1. `You: My name is Pooja and I love graph databases.`
