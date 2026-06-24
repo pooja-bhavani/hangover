@@ -1,4 +1,4 @@
-# hangover — a reliable long-term-memory agent
+# hangover — a reliable long-term-memory agent 
 
 A terminal chat agent that **remembers across sessions**, with safety and reliability
 built in. Claude does the reasoning; a Neo4j knowledge graph
