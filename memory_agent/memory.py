@@ -14,6 +14,7 @@ ready-to-inject text blob combining short-term and long-term recall for a query.
 
 from __future__ import annotations
 
+import asyncio
 import os
 
 from neo4j_agent_memory import (
@@ -64,25 +65,40 @@ def _settings() -> MemorySettings:
 
 
 class Memory:
-    """Thin facade over MemoryClient with connect/close lifecycle."""
+    """Synchronous facade over the *async* MemoryClient.
+
+    neo4j-agent-memory 0.5's client API is async (``connect``/``close``/
+    ``get_context``/``short_term.add_message``/``wait_for_pending`` are all
+    coroutines). Our CLI and eval harness are synchronous, so we own a dedicated
+    event loop and run each coroutine to completion on it.
+    """
 
     def __init__(self) -> None:
         self._client = MemoryClient(_settings())
+        self._loop = asyncio.new_event_loop()
+
+    def _run(self, coro):
+        return self._loop.run_until_complete(coro)
 
     def connect(self) -> None:
-        self._client.connect()
+        self._run(self._client.connect())
 
     def close(self) -> None:
-        self._client.close()
+        try:
+            self._run(self._client.close())
+        finally:
+            self._loop.close()
 
     def get_context(self, query: str, session_id: str) -> str:
         """Retrieved short-term + long-term context for the current query."""
-        return self._client.get_context(query, session_id=session_id, max_items=10)
+        return self._run(
+            self._client.get_context(query, session_id=session_id, max_items=10)
+        )
 
     def add_message(self, session_id: str, role: str, content: str) -> None:
         """Persist a turn; entity/fact/preference extraction runs from it."""
-        self._client.short_term.add_message(session_id, role, content)
+        self._run(self._client.short_term.add_message(session_id, role, content))
 
     def flush(self) -> None:
         """Block until pending background extraction finishes (call before exit)."""
-        self._client.wait_for_pending()
+        self._run(self._client.wait_for_pending())
