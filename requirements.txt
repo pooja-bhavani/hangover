@@ -1,0 +1,12 @@
+anthropic>=0.40
+neo4j-agent-memory[anthropic,sentence-transformers]>=0.5.0
+python-dotenv>=1.0
+
+# Guardrails (NeMo Guardrails) + the Anthropic engine it uses for rail checks.
+# NeMo requires Python 3.12/3.13 — it does not import on 3.14.
+# NeMo's langchain framework (NEMOGUARDRAILS_LLM_FRAMEWORK=langchain) needs the
+# base langchain + community packages plus the Anthropic provider.
+nemoguardrails>=0.22
+langchain>=0.3
+langchain-community>=0.3
+langchain-anthropic>=0.2

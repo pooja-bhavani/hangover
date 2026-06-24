@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "skills": {
+    "agent-evaluation": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "skillPath": "cli-tool/components/skills/ai-research/agent-evaluation/SKILL.md",
+      "computedHash": "28c319f7d6b754121b58683e28c146985794d25d03f04420737e2fb4446b1be9"
+    },
+    "find-skills": {
+      "source": "vercel-labs/skills",
+      "sourceType": "github",
+      "skillPath": "skills/find-skills/SKILL.md",
+      "computedHash": "9e1c8b3103f92fa8092568a44fe64858de7c5c9dc65ce4bea8f168080e889cfd"
+    },
+    "nemo-guardrails": {
+      "source": "davila7/claude-code-templates",
+      "sourceType": "github",
+      "skillPath": "cli-tool/components/skills/ai-research/safety-alignment-nemo-guardrails/SKILL.md",
+      "computedHash": "9fcbe1ce0f7c9509f678e48eba62b883452b793d6d09004923ff58d10db45721"
+    },
+    "neo4j-agent-memory-skill": {
+      "source": "neo4j-contrib/neo4j-skills",
+      "sourceType": "github",
+      "skillPath": "neo4j-agent-memory-skill/SKILL.md",
+      "computedHash": "b76f9bbc59cdea51a673b70d7906bf483e2c011f1580df3f73e3343868080488"
+    },
+    "observability-llm-obs": {
+      "source": "elastic/agent-skills",
+      "sourceType": "github",
+      "skillPath": "skills/observability/llm-obs/SKILL.md",
+      "computedHash": "a8fb50984d788fa2eceb4af0aad5366978e96ef505b3ae2fa49c2c75095466aa"
+    },
+    "rag-implementation": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "skillPath": "skills/rag-implementation/SKILL.md",
+      "computedHash": "0c86261f73ff427f4594b9419b1bd8e94a184002d57c8af31fc4ac2e7dbe8fe2"
+    }
+  }
+}

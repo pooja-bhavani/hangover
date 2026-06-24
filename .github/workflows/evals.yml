@@ -1,0 +1,63 @@
+name: agent-evals
+
+# Enforce agent reliability on every change: guardrails must block jailbreaks and
+# long-term memory must recall stated facts. Gates on `python -m evals.run_evals`.
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  evals:
+    runs-on: ubuntu-latest
+
+    services:
+      neo4j:
+        image: neo4j:5.26
+        env:
+          NEO4J_AUTH: neo4j/testpassword
+          NEO4J_PLUGINS: '["apoc"]'
+        ports:
+          - 7687:7687
+          - 7474:7474
+        # Neo4j is ready once cypher-shell can run a trivial query.
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p testpassword 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      NEO4J_URI: bolt://localhost:7687
+      NEO4J_USERNAME: neo4j
+      NEO4J_PASSWORD: testpassword
+      # Self-check guardrails + long-term extraction call Claude.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+      # NeMo Guardrails uses its langchain framework for the Anthropic engine.
+      NEMOGUARDRAILS_LLM_FRAMEWORK: langchain
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"   # NeMo Guardrails does not import on 3.14
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Skip notice (no API key)
+        if: ${{ env.ANTHROPIC_API_KEY == '' }}
+        run: |
+          echo "::warning::ANTHROPIC_API_KEY secret not set — skipping evals." \
+               "Add it in repo Settings → Secrets to enforce reliability checks."
+
+      - name: Run agent evals
+        if: ${{ env.ANTHROPIC_API_KEY != '' }}
+        run: python -m evals.run_evals
