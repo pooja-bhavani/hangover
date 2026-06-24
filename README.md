@@ -1,16 +1,20 @@
 # hangover — a reliable long-term-memory agent 
 
+> Built for the **WeMakeDevs × Cognee "The Hangover Part AI: Where's My Context?"**
+> hackathon — *build AI that doesn't forget*. **Cognee is the memory layer** (the event's
+> one hard rule), with Claude reasoning and production guardrails/observability on top.
+
 A terminal chat agent that **remembers across sessions**, with safety and reliability
-built in. Claude does the reasoning; a Neo4j knowledge graph
-(via [`neo4j-agent-memory`](https://pypi.org/project/neo4j-agent-memory/)) holds the memory.
+built in. Claude does the reasoning; **Cognee** builds a semantic knowledge graph
+(stored in Neo4j) that the agent recalls from in later sessions.
 
 Each turn runs through three layers, every one backed by a vetted skill rather than
 hand-rolled code:
 
 | Layer | What it does | Skill / tool |
 |-------|--------------|--------------|
+| **Memory** | Builds a semantic knowledge graph from the conversation and recalls it across sessions | **Cognee** (`cognee`, graph on Neo4j, local fastembed) |
 | **Guardrails** | Safety-checks every user input and assistant output (jailbreak, prompt-injection, harmful/illegal, system-prompt extraction) | NVIDIA **NeMo Guardrails** (`nemo-guardrails`) |
-| **Memory** | Short-term conversation + long-term POLE+O entities/facts/preferences, recalled across sessions | **neo4j-agent-memory** (graph) |
 | **Observability** | Writes an OTel-GenAI trace line per turn (latency, tokens, guardrail verdicts, errors) | **observability-llm-obs** (Elastic) |
 | **Evaluation** | Behavioral/regression tests for guardrails + memory recall | **agent-evaluation** |
 
@@ -56,8 +60,8 @@ Commands inside the chat: type a message, or `:quit` to exit.
 3. `:quit`, then `python -m memory_agent.main` again.
 4. `You: What's my name?` → recalls **Pooja** from long-term memory across the restart.
 
-Open http://localhost:7474 to browse the graph — you'll see `PERSON` entity nodes and
-preference/fact relationships built from the conversation.
+Open http://localhost:7474 to browse the graph — you'll see the entity nodes and
+relationships Cognee extracted from the conversation.
 
 ## Reliability
 
@@ -91,9 +95,12 @@ warns and skips rather than failing forks.
 
 ## Notes
 
-- Reasoning model is `claude-opus-4-8` (Anthropic SDK, streamed).
-- Recall embeddings run locally via `sentence-transformers` (no embeddings API call).
-- Memory persists in the `neo4j_data` Docker volume; `docker compose down -v` wipes it.
+- Reasoning model is `claude-opus-4-8` (Anthropic SDK, streamed); Cognee's graph
+  extraction/recall uses `claude-haiku-4-5`.
+- Cognee builds the knowledge graph in **Neo4j** and embeds locally via **fastembed**
+  (BGE-small, no embeddings API call); its vector/relational stores default to local
+  LanceDB/SQLite.
+- Graph memory persists in the `neo4j_data` Docker volume; `docker compose down -v` wipes it.
 
 ## Roadmap
 

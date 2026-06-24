@@ -8,3 +8,9 @@ traces/
 # Editor + vendored agent skills (re-installable via skills-lock.json)
 .vscode/
 .agents/
+
+# Cognee local stores / logs
+.cognee/
+.cognee_system/
+.data/
+cognee_system/

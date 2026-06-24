@@ -1,5 +1,6 @@
 anthropic>=0.40
-neo4j-agent-memory[anthropic,sentence-transformers]>=0.5.0
+# Cognee is the required memory layer: Claude LLM + Neo4j graph + local fastembed.
+cognee[anthropic,neo4j,fastembed]>=1.2.1
 python-dotenv>=1.0
 
 # Guardrails (NeMo Guardrails) + the Anthropic engine it uses for rail checks.

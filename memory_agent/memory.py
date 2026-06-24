@@ -1,15 +1,18 @@
-"""Graph-native long-term memory, backed by Neo4j via ``neo4j-agent-memory`` (0.5.x).
+"""Long-term memory powered by **Cognee** — the hackathon's required memory layer.
 
-The 0.5 API is synchronous. We configure it for a local, key-light setup:
+Cognee builds a semantic knowledge graph from what the agent is told and recalls it
+later. We configure it for a local, key-light setup:
 
-- **Embeddings:** local ``sentence-transformers`` (MiniLM, 384-dim) — no embeddings API.
-- **Extraction:** the pure-LLM extractor using **Anthropic** (Claude) — so the only
-  external credential needed is ``ANTHROPIC_API_KEY``. This avoids the default
-  OpenAI/spaCy/GLiNER pipeline and its extra model downloads.
+- **LLM** (graph extraction + recall): **Anthropic / Claude** (`cognee[anthropic]`),
+  so the only credential needed is ``ANTHROPIC_API_KEY``.
+- **Graph store**: **Neo4j** (`cognee[neo4j]`), the same local Docker container.
+- **Embeddings**: local **fastembed** (`cognee[fastembed]`, BGE-small, 384-dim) —
+  no embeddings API call. Vector + relational stores default to local LanceDB/SQLite.
 
-``add_message`` stores a turn in short-term memory and (by default) extracts entities,
-facts, and preferences into the long-term knowledge graph. ``get_context`` returns a
-ready-to-inject text blob combining short-term and long-term recall for a query.
+Cognee's API is module-level and async. ``add_message`` → ``cognee.remember`` (ingest +
+build graph for a session); ``get_context`` → ``cognee.recall(..., only_context=True)``
+(retrieve graph context for a query). Our CLI/eval harness is synchronous, so we drive
+the coroutines on a dedicated event loop.
 """
 
 from __future__ import annotations
@@ -17,88 +20,76 @@ from __future__ import annotations
 import asyncio
 import os
 
-from neo4j_agent_memory import (
-    EmbeddingConfig,
-    EmbeddingProvider,
-    ExtractionConfig,
-    ExtractorType,
-    LLMConfig,
-    LLMProvider,
-    MemoryClient,
-    MemorySettings,
-    Neo4jConfig,
-)
+import cognee
 
-# Cheap Claude model for the frequent extraction calls; reasoning uses Opus (see llm.py).
 EXTRACTION_MODEL = "claude-haiku-4-5"
-EMBEDDING_MODEL = "sentence-transformers/all-MiniLM-L6-v2"
+EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # fastembed default; 384-dim
 EMBEDDING_DIMS = 384
 
 
-def _settings() -> MemorySettings:
-    anthropic_key = os.environ.get("ANTHROPIC_API_KEY")
-    return MemorySettings(
-        neo4j=Neo4jConfig(
-            uri=os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
-            username=os.environ.get("NEO4J_USERNAME", "neo4j"),
-            password=os.environ["NEO4J_PASSWORD"],
-        ),
-        embedding=EmbeddingConfig(
-            provider=EmbeddingProvider.SENTENCE_TRANSFORMERS,
-            model=EMBEDDING_MODEL,
-            dimensions=EMBEDDING_DIMS,
-            device="cpu",
-        ),
-        llm=LLMConfig(
-            provider=LLMProvider.ANTHROPIC,
-            model=EXTRACTION_MODEL,
-            api_key=anthropic_key,
-        ),
-        extraction=ExtractionConfig(
-            extractor_type=ExtractorType.LLM,
-            enable_spacy=False,
-            enable_gliner=False,
-            enable_llm_fallback=True,
-            llm_model=EXTRACTION_MODEL,
-        ),
-    )
+def _result_to_text(results) -> str:
+    """Flatten Cognee recall/search results into a context string for the prompt."""
+    if results is None:
+        return ""
+    if isinstance(results, str):
+        return results
+    parts: list[str] = []
+    for r in results if isinstance(results, (list, tuple)) else [results]:
+        for attr in ("context", "text", "answer", "content"):
+            val = getattr(r, attr, None)
+            if isinstance(val, str) and val.strip():
+                parts.append(val.strip())
+                break
+        else:
+            parts.append(str(r))
+    return "\n".join(parts)
 
 
 class Memory:
-    """Synchronous facade over the *async* MemoryClient.
-
-    neo4j-agent-memory 0.5's client API is async (``connect``/``close``/
-    ``get_context``/``short_term.add_message``/``wait_for_pending`` are all
-    coroutines). Our CLI and eval harness are synchronous, so we own a dedicated
-    event loop and run each coroutine to completion on it.
-    """
+    """Synchronous facade over Cognee's async, module-level memory API."""
 
     def __init__(self) -> None:
-        self._client = MemoryClient(_settings())
         self._loop = asyncio.new_event_loop()
 
     def _run(self, coro):
         return self._loop.run_until_complete(coro)
 
     def connect(self) -> None:
-        self._run(self._client.connect())
-
-    def close(self) -> None:
-        try:
-            self._run(self._client.close())
-        finally:
-            self._loop.close()
-
-    def get_context(self, query: str, session_id: str) -> str:
-        """Retrieved short-term + long-term context for the current query."""
-        return self._run(
-            self._client.get_context(query, session_id=session_id, max_items=10)
+        """Configure Cognee: Claude LLM, local fastembed, Neo4j graph backend."""
+        key = os.environ["ANTHROPIC_API_KEY"]
+        cognee.config.set_llm_config(
+            {"llm_provider": "anthropic", "llm_model": EXTRACTION_MODEL, "llm_api_key": key}
+        )
+        cognee.config.set_embedding_provider("fastembed")
+        cognee.config.set_embedding_model(EMBEDDING_MODEL)
+        cognee.config.set_embedding_dimensions(EMBEDDING_DIMS)
+        cognee.config.set_graph_database_provider("neo4j")
+        cognee.config.set_graph_db_config(
+            {
+                "graph_database_url": os.environ.get("NEO4J_URI", "bolt://localhost:7687"),
+                "graph_database_username": os.environ.get("NEO4J_USERNAME", "neo4j"),
+                "graph_database_password": os.environ["NEO4J_PASSWORD"],
+            }
         )
 
+    def close(self) -> None:
+        self._loop.close()
+
+    def get_context(self, query: str, session_id: str) -> str:
+        """Retrieve graph context for the query (no answer generation)."""
+        results = self._run(
+            cognee.recall(query, session_id=session_id, only_context=True, top_k=10)
+        )
+        return _result_to_text(results)
+
     def add_message(self, session_id: str, role: str, content: str) -> None:
-        """Persist a turn; entity/fact/preference extraction runs from it."""
-        self._run(self._client.short_term.add_message(session_id, role, content))
+        """Ingest a turn and build the knowledge graph for this session."""
+        self._run(
+            cognee.remember(
+                f"{role}: {content}", session_id=session_id, self_improvement=False
+            )
+        )
 
     def flush(self) -> None:
-        """Block until pending background extraction finishes (call before exit)."""
-        self._run(self._client.wait_for_pending())
+        """Cognee persists synchronously per call; nothing extra to flush."""
+        return None
