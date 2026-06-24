@@ -22,6 +22,7 @@ import streamlit as st
 import streamlit.components.v1 as components
 from dotenv import load_dotenv
 
+from memory_agent import _config
 from memory_agent.guardrails import Guardrails
 from memory_agent.llm import MODEL, LLM
 from memory_agent.main import SYSTEM_PROMPT, _build_messages
@@ -35,7 +36,8 @@ st.set_page_config(page_title="hangover — memory agent", page_icon="🧠")
 @st.cache_resource(show_spinner="Loading guardrails + connecting Cognee memory…")
 def _pipeline():
     """Build the heavy, stateful components once and reuse across reruns."""
-    missing = [v for v in ("ANTHROPIC_API_KEY", "NEO4J_PASSWORD") if not os.environ.get(v)]
+    required = [] if _config.LOCAL else ["ANTHROPIC_API_KEY", "NEO4J_PASSWORD"]
+    missing = [v for v in required if not os.environ.get(v)]
     if missing:
         st.error(f"Missing env vars: {', '.join(missing)} (see .env.example).")
         st.stop()

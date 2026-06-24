@@ -23,8 +23,14 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 
-# NeMo's langchain integration must be selected before importing nemoguardrails.
-os.environ.setdefault("NEMOGUARDRAILS_LLM_FRAMEWORK", "langchain")
+from . import _config
+
+if _config.LOCAL:
+    # Ollama is OpenAI-compatible; the default NeMo framework handles base_url.
+    os.environ.setdefault("OPENAI_API_KEY", "ollama")
+else:
+    # NeMo's Anthropic engine runs through its langchain framework.
+    os.environ.setdefault("NEMOGUARDRAILS_LLM_FRAMEWORK", "langchain")
 
 from nemoguardrails import LLMRails, RailsConfig  # noqa: E402
 from nemoguardrails.rails.llm.options import GenerationOptions  # noqa: E402
@@ -32,11 +38,25 @@ from nemoguardrails.rails.llm.options import GenerationOptions  # noqa: E402
 GUARD_MODEL = "claude-haiku-4-5"
 FAIL_CLOSED = False  # on guard error: False = allow (fail open), True = block
 
-_CONFIG_YAML = f"""
+if _config.LOCAL:
+    _MODELS_YAML = f"""
+models:
+  - type: main
+    engine: openai
+    model: {_config.OLLAMA_MODEL}
+    parameters:
+      base_url: {_config.OLLAMA_BASE_URL}/v1
+      api_key: ollama
+"""
+else:
+    _MODELS_YAML = f"""
 models:
   - type: main
     engine: anthropic
     model: {GUARD_MODEL}
+"""
+
+_CONFIG_YAML = _MODELS_YAML + """
 rails:
   input:
     flows:
@@ -95,11 +115,18 @@ def _content(response) -> str:
 
 class Guardrails:
     def __init__(self) -> None:
-        config = RailsConfig.from_content(yaml_content=_CONFIG_YAML + _PROMPTS_YAML)
-        self._rails = LLMRails(config)
+        # If the rail engine can't initialize, disable rails (fail open) rather
+        # than crash the whole app — guardrails degrade, the agent still runs.
+        try:
+            config = RailsConfig.from_content(yaml_content=_CONFIG_YAML + _PROMPTS_YAML)
+            self._rails = LLMRails(config)
+        except Exception:
+            self._rails = None
 
     def check_input(self, text: str) -> GuardResult:
         """Block disallowed user input before it reaches the agent."""
+        if self._rails is None:
+            return GuardResult(allowed=True, error="guardrails disabled")
         try:
             resp = self._rails.generate(
                 messages=[{"role": "user", "content": text}], options=_INPUT_ONLY
@@ -113,6 +140,8 @@ class Guardrails:
 
     def check_output(self, user_text: str, bot_text: str) -> GuardResult:
         """Block disallowed assistant output before the user sees it."""
+        if self._rails is None:
+            return GuardResult(allowed=True, error="guardrails disabled")
         try:
             resp = self._rails.generate(
                 messages=[

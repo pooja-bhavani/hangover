@@ -22,6 +22,8 @@ import os
 
 import cognee
 
+from . import _config
+
 EXTRACTION_MODEL = "claude-haiku-4-5"
 EMBEDDING_MODEL = "BAAI/bge-small-en-v1.5"  # fastembed default; 384-dim
 EMBEDDING_DIMS = 384
@@ -55,14 +57,32 @@ class Memory:
         return self._loop.run_until_complete(coro)
 
     def connect(self) -> None:
-        """Configure Cognee: Claude LLM, local fastembed, Neo4j graph backend."""
-        key = os.environ["ANTHROPIC_API_KEY"]
-        cognee.config.set_llm_config(
-            {"llm_provider": "anthropic", "llm_model": EXTRACTION_MODEL, "llm_api_key": key}
-        )
+        """Configure Cognee. Embeddings are local fastembed in both modes."""
         cognee.config.set_embedding_provider("fastembed")
         cognee.config.set_embedding_model(EMBEDDING_MODEL)
         cognee.config.set_embedding_dimensions(EMBEDDING_DIMS)
+
+        if _config.LOCAL:
+            # Offline: Ollama LLM + embedded Kuzu graph (no API key, no Docker).
+            cognee.config.set_llm_config(
+                {
+                    "llm_provider": "ollama",
+                    "llm_model": _config.OLLAMA_MODEL,
+                    "llm_endpoint": f"{_config.OLLAMA_BASE_URL}/v1",
+                    "llm_api_key": "ollama",
+                }
+            )
+            cognee.config.set_graph_database_provider("kuzu")
+            return
+
+        # Default: Claude LLM + Neo4j graph backend.
+        cognee.config.set_llm_config(
+            {
+                "llm_provider": "anthropic",
+                "llm_model": EXTRACTION_MODEL,
+                "llm_api_key": os.environ["ANTHROPIC_API_KEY"],
+            }
+        )
         cognee.config.set_graph_database_provider("neo4j")
         cognee.config.set_graph_db_config(
             {

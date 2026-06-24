@@ -64,6 +64,18 @@ source .venv/bin/activate
 streamlit run app.py            # opens http://localhost:8501
 ```
 
+### Offline / free local mode (no Docker, no API key)
+
+Set `HANGOVER_LOCAL=1` to run everything locally — **Ollama** for the LLM (reasoning,
+Cognee extraction, guardrail checks), embedded **Kuzu** for the graph (no Neo4j), and
+local fastembed. Great for a zero-cost demo; quality is bounded by the local model.
+
+```bash
+ollama pull qwen2.5:0.5b        # or a larger model; override with HANGOVER_OLLAMA_MODEL
+HANGOVER_LOCAL=1 streamlit run app.py
+# CLI: HANGOVER_LOCAL=1 python -m memory_agent.main
+```
+
 ## Prove the memory works
 
 1. `You: My name is Pooja and I love graph databases.`
